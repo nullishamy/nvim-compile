@@ -16,3 +16,7 @@ The default opts are
 and are passed into `require('nvim-compile').setup()` to configure the plugin.
 
 NOTE: You must call setup before you can use the plugin.
+
+This plugin depends on the following:
+- [plenary](https://github.com/nvim-lua/plenary.nvim)
+- [nui](https://github.com/MunifTanjim/nui.nvim)
