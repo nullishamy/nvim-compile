@@ -7,7 +7,7 @@ local log = require('nvim-compile.log')
 
 local DEFAULT_OPTS = {
   path = Path:new(vim.fn.stdpath('data'), 'nvim-compile', 'data.json'),
-  open_with = function (cmd)
+  open_with = function(cmd)
     require('FTerm').scratch({ cmd = cmd })
   end
 }
@@ -29,7 +29,8 @@ local function show_select(prompt, on_select)
     format_item = function(item)
       -- Remove the workspace portion from the file path
       -- + 2, 1 indexing & cut the leading slash
-      return string.format('%s (%s) [%s]', item.workspace, string.sub(item.path, string.len(item.workspace) + 2), item.type == 'workspace' and 'W' or 'F')
+      return string.format('%s (%s) [%s]', item.workspace, string.sub(item.path, string.len(item.workspace) + 2),
+        item.type == 'workspace' and 'W' or 'F')
     end,
   }, on_select)
 end
@@ -49,6 +50,78 @@ function compile.setup(opts)
   compile.loaded = true
 end
 
+local function open_popup(val, index)
+  local function center(str)
+    local width = 60
+    local shift = math.floor(width / 2) - math.floor(string.len(str) / 2)
+    return string.rep(' ', shift) .. str
+  end
+
+  local Popup = require('nui.popup')
+
+  local popup = Popup({
+    position = "50%",
+    size = {
+      width = 60,
+      height = 20
+    },
+    enter = true,
+    focusable = false,
+    zindex = 50,
+    relative = "editor",
+    border = {
+      style = "rounded",
+    },
+    buf_options = {
+      modifiable = false,
+      readonly = true,
+    },
+    win_options = {
+      winblend = 10,
+      winhighlight = "Normal:Normal,FloatBorder:FloatBorder",
+    },
+  })
+
+  vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, {
+    '',
+    center('path:'),
+    center(val.path),
+    '',
+    center('workspace:'),
+    center(val.workspace),
+    '',
+    center('runs:'),
+    center(val.cmd),
+    '',
+    center('type:'),
+    center(val.type),
+    '',
+    '',
+    '',
+    center('keys:'),
+    center('[q: quit]'),
+    center('[d: delete]')
+  })
+
+  local map_opts = {
+    nowait = true
+  }
+
+  popup:map('n', 'q', function()
+    popup:unmount()
+  end, map_opts)
+
+  popup:map('n', 'd', function()
+    table.remove(compile.datastore.data, index)
+    compile.datastore:write()
+
+    log.info(string.format('removed command for %s %s', val.type == 'workspace' and 'workspace' or 'buffer',
+      val.type == 'workspace' and val.workspace or val.path))
+  end, map_opts)
+
+  popup:mount()
+end
+
 function compile.view()
   if not compile.loaded then
     return log.error('cannot `view` without calling `setup` first!')
@@ -57,66 +130,12 @@ function compile.view()
   assert(compile.config, 'config was not set when calling `view`')
   compile.datastore:init()
 
-  local actions = {
-    d = function(val, index)
-      table.remove(compile.datastore.data, index)
-      compile.datastore:write()
-
-      log.info(string.format('removed command for %s %s', val.type == 'workspace' and 'workspace' or 'buffer',
-        val.type == 'workspace' and val.workspace or val.path))
-    end,
-    v = function(val)
-
-      local function center(str, bufnr)
-        local width = vim.api.nvim_win_get_width(bufnr)
-        local shift = math.floor(width / 2) - math.floor(string.len(str) / 2)
-        return string.rep(' ', shift) .. str
-      end
-
-      -- No border
-      local Window = require('plenary.window.float')
-      local window = Window.percentage_range_window(0.25, 0.35, {},
-        { border_thickness = { top = 0, right = 0, bot = 0, left = 0 } })
-
-      vim.api.nvim_buf_set_lines(window.bufnr, 0, -1, false, {
-        '',
-        center('path:', window.win_id),
-        center(val.path, window.win_id),
-        '',
-        center('workspace:', window.win_id),
-        center(val.workspace, window.win_id),
-        '',
-        center('runs:', window.win_id),
-        center(val.cmd, window.win_id),
-        '',
-        center('type:', window.win_id),
-        center(val.type, window.win_id),
-        ''
-      })
-    end
-  }
-
-  show_select('Commands', function(val, index)
-    -- TODO: improve this UX
-    -- Probably by adding custom binds to the window that we spawm with `v`
-    -- And adding a small help text at the bottom
+  show_select('Select a command', function(val, index)
     if index == nil then
       return
     end
 
-    local action = vim.fn.input('what would you like to do? (d)elete (v)iew: ')
-
-    if action == nil then
-      return
-    end
-
-    if not vim.tbl_contains({ 'd', 'v' }, action) then
-      -- Just no-op, its the easiest way to handle invalid action
-      return
-    end
-
-    -- No nil check needed, we validate above
-    actions[action](val, index)
+    open_popup(val, index)
   end)
 end
 
