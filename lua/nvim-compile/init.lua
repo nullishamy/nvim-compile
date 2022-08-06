@@ -9,7 +9,12 @@ local DEFAULT_OPTS = {
   path = Path:new(vim.fn.stdpath('data'), 'nvim-compile', 'data.json'),
   open_with = function(cmd)
     require('FTerm').scratch({ cmd = cmd })
-  end
+  end,
+  substitutions = {
+    ['%%'] = function()
+      return require('nvim-compile.util').buf_path() or 'unknown'
+    end
+  }
 }
 
 local compile = {
@@ -161,7 +166,7 @@ end
 local function run_associated()
   local cur_buf = util.buf_path()
 
-  if string.len(cur_buf) == 0 then
+  if cur_buf == nil then
     cur_buf = 'unknown'
   end
 
@@ -179,8 +184,15 @@ local function run_associated()
     return log.info('could not locate compile command for this file or workspace')
   end
 
-  -- Double % to escape it for lua pattern matching
-  local cmd = string.gsub(val.cmd, '%%', cur_buf)
+  local cmd = val.cmd
+
+  for key, fn in pairs(compile.config.substitutions) do
+    if fn == nil then
+      return log.error(string.format('substitution function for `%s` was nil', key))
+    end
+
+    cmd = string.gsub(cmd, key, fn())
+  end
 
   -- Log the command we're running so the user can see it
   compile.config.open_with(string.format([[ echo "(nvim-compile) executing '%s' \n" && %s ]], cmd, cmd))
@@ -192,7 +204,7 @@ local function set_command(cmd)
 
   local path = util.buf_path()
 
-  if string.len(path) == 0 then
+  if path == nil then
     log.warn('cannot set compile command for an un-named buffer')
     return
   end
@@ -228,8 +240,10 @@ local function set_command(cmd)
       assert(val, 'entry did not exist (val)')
 
       val.cmd = cmd
-    end
 
+      -- Write the update
+      compile.datastore:write()
+    end
     return
   end
 

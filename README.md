@@ -9,7 +9,12 @@ The default opts are
   path = Path:new(vim.fn.stdpath('data'), 'nvim-compile', 'data.json'),
   open_with = function (cmd)
     require('FTerm').scratch({ cmd = cmd })
-  end
+  end,
+  substitutions = {
+    ['%%'] = function()
+      return require('nvim-compile.util').buf_path() or 'unknown'
+    end
+  }
 }
 ```
 

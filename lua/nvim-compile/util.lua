@@ -5,7 +5,13 @@ function M.workspace_path()
 end
 
 function M.buf_path()
-  return vim.fn.expand('%:p')
+  local val = vim.fn.expand('%:p')
+
+  if string.len(val) == 0 then
+    return nil
+  end
+
+  return val
 end
 
 return M
