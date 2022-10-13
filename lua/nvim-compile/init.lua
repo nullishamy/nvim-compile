@@ -114,6 +114,7 @@ local function open_popup(val, index)
 
   popup:map('n', 'q', function()
     popup:unmount()
+    compile.view()
   end, map_opts)
 
   popup:map('n', 'd', function()
@@ -122,6 +123,9 @@ local function open_popup(val, index)
 
     log.info(string.format('removed command for %s %s', val.type == 'workspace' and 'workspace' or 'buffer',
       val.type == 'workspace' and val.workspace or val.path))
+
+    popup:unmount()
+    compile.view()
   end, map_opts)
 
   popup:mount()
